@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const PLAYERS_FILE = path.join('data', 'players.json');
+const PLAYERS_FILE = 'players.json';
 const HISTORY_FILE = path.join('data', 'history.json');
 
 // Query GraphQL per Sorare

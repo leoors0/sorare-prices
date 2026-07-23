@@ -3,8 +3,8 @@
     "name": "Kylian Mbappé",
     "displayName": "Kylian Mbappé",
     "lastUpdate": "2026-07-23",
-    "limited": 180,
-    "rare": 1400,
+    "limited": 0,
+    "rare": 0,
     "super_rare": 0,
     "unique": 0,
     "prices": [
@@ -14,6 +14,13 @@
         "rare": 1400,
         "superRare": 0,
         "unique": 0
+      },
+      {
+        "date": "2026-07-23",
+        "limited": 0,
+        "rare": 0,
+        "superRare": 0,
+        "unique": 0
       }
     ]
   },
@@ -21,8 +28,8 @@
     "name": "Erling Haaland",
     "displayName": "Erling Haaland",
     "lastUpdate": "2026-07-23",
-    "limited": 150,
-    "rare": 1200,
+    "limited": 0,
+    "rare": 0,
     "super_rare": 0,
     "unique": 0,
     "prices": [
@@ -32,6 +39,13 @@
         "rare": 1200,
         "superRare": 0,
         "unique": 0
+      },
+      {
+        "date": "2026-07-23",
+        "limited": 0,
+        "rare": 0,
+        "superRare": 0,
+        "unique": 0
       }
     ]
   },
@@ -39,8 +53,8 @@
     "name": "Jude Bellingham",
     "displayName": "Jude Bellingham",
     "lastUpdate": "2026-07-23",
-    "limited": 120,
-    "rare": 950,
+    "limited": 0,
+    "rare": 0,
     "super_rare": 0,
     "unique": 0,
     "prices": [
@@ -48,6 +62,13 @@
         "date": "2026-07-23",
         "limited": 120,
         "rare": 950,
+        "superRare": 0,
+        "unique": 0
+      },
+      {
+        "date": "2026-07-23",
+        "limited": 0,
+        "rare": 0,
         "superRare": 0,
         "unique": 0
       }

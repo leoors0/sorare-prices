@@ -4,19 +4,25 @@ import path from 'path';
 const PLAYERS_FILE = 'players.json';
 const HISTORY_FILE = path.join('data', 'history.json');
 
-// Query corretta senza il campo 'cards' errato
+// Query per recuperare le offerte attive sul mercato secondario
 const QUERY = `
-  query GetPlayerPrices($slug: String!) {
+  query GetMarketPrices($slug: String!) {
     football {
       player(slug: $slug) {
         displayName
-        activeCards(rarities: [limited, rare, super_rare, unique]) {
-          nodes {
-            rarity
-            liveSingleSaleOffer {
-              priceInEURCent
-              price
-            }
+      }
+    }
+    tokens {
+      cards(
+        playerSlugs: [$slug]
+        onSale: true
+        first: 50
+      ) {
+        nodes {
+          rarity
+          liveSingleSaleOffer {
+            priceInEURCent
+            price
           }
         }
       }
@@ -40,17 +46,15 @@ async function fetchSorarePrices(slug) {
 
     const json = await response.json();
     const player = json?.data?.football?.player;
-    if (!player) return null;
+    const cardNodes = json?.data?.tokens?.cards?.nodes || [];
 
     const prices = { limited: null, rare: null, super_rare: null, unique: null };
 
-    // Estrae i prezzi minimi dei manager per ciascuna rarità
-    const cards = player.activeCards?.nodes || [];
-    cards.forEach(card => {
+    cardNodes.forEach(card => {
       const rarity = card.rarity;
       const offer = card.liveSingleSaleOffer;
 
-      if (offer) {
+      if (offer && rarity in prices) {
         let priceEur = null;
 
         if (offer.priceInEURCent) {
@@ -68,7 +72,7 @@ async function fetchSorarePrices(slug) {
     });
 
     return {
-      displayName: player.displayName,
+      displayName: player?.displayName || slug,
       prices
     };
   } catch (err) {
@@ -98,7 +102,7 @@ async function main() {
   const nowIso = new Date().toISOString();
 
   for (const p of players) {
-    console.log(`Aggiorno prezzi manager per ${p.name}...`);
+    console.log(`Recupero prezzi mercato per ${p.name}...`);
     const data = await fetchSorarePrices(p.slug);
 
     const displayName = data?.displayName || p.name;
@@ -126,7 +130,7 @@ async function main() {
   }
 
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
-  console.log('✅ File history.json salvato con i prezzi corretti!');
+  console.log('✅ Aggiornato history.json con i dati di mercato!');
 }
 
 main();

@@ -2,29 +2,31 @@ name: Aggiorna prezzi Sorare
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
-  workflow_dispatch: {}
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  update:
+  update-data:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
 
-      - name: Aggiorna prezzi
+      - name: Esegui script
         run: node scripts/update-prices.mjs
 
-      - name: Salva risultati
+      - name: Salva e pubblica i prezzi aggiornati
         run: |
-          git config user.name "sorare-price-bot"
-          git config user.email "bot@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add data/history.json
-          git diff --quiet --cached || git commit -m "Aggiornamento prezzi automatico"
+          git commit -m "Auto-update prezzi" || exit 0
           git push

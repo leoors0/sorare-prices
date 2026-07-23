@@ -4,7 +4,6 @@ import path from 'path';
 const PLAYERS_FILE = 'players.json';
 const HISTORY_FILE = path.join('data', 'history.json');
 
-// Query GraphQL identica a quella usata dal sito ufficiale Sorare per le Manager Sales
 const QUERY = `
   query GetManagerSalesFloorPrice($slug: String!, $rarity: CardRarity!) {
     football {
@@ -33,7 +32,7 @@ async function fetchFloorPrice(slug, rarity) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        'User-Agent': 'Mozilla/5.0'
       },
       body: JSON.stringify({
         query: QUERY,
@@ -48,54 +47,35 @@ async function fetchFloorPrice(slug, rarity) {
     if (!card) return { price: null, displayName: player?.displayName || null };
 
     const offer = card.liveSingleSaleOffer;
+    console.log(`OFFERTA RICEVUTA PER ${slug} [${rarity}]:`, JSON.stringify(offer));
+
     let priceEur = null;
 
     if (offer) {
       if (offer.priceInEURCent) {
         priceEur = Math.round(offer.priceInEURCent / 100);
       } else if (offer.price) {
-        // Conversione da Wei in EUR
-        priceEur = Math.round((parseFloat(offer.price) / 1e18) * 2500);
+        // Se il prezzo è una stringa numerica in EUR o Wei
+        const val = parseFloat(offer.price);
+        priceEur = val > 1000000 ? Math.round((val / 1e18) * 2500) : Math.round(val);
       }
     }
 
     return { price: priceEur, displayName: player?.displayName || null };
   } catch (err) {
-    console.error(`Errore recupero ${slug} [${rarity}]:`, err);
+    console.error(`Errore ${slug} [${rarity}]:`, err);
     return { price: null, displayName: null };
   }
 }
 
 async function main() {
-  let players = [];
-  try {
-    players = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
-  } catch (e) {
-    console.error('Errore lettura players.json:', e);
-    return;
-  }
-
-  let history = {};
-  if (fs.existsSync(HISTORY_FILE)) {
-    try {
-      history = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
-    } catch {
-      history = {};
-    }
-  }
+  let players = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
+  let history = fs.existsSync(HISTORY_FILE) ? JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')) : {};
 
   const nowIso = new Date().toISOString();
-  // Rarità formattate secondo l'enum di Sorare (in maiuscolo)
-  const raritiesMap = {
-    limited: 'LIMITED',
-    rare: 'RARE',
-    super_rare: 'SUPER_RARE',
-    unique: 'UNIQUE'
-  };
+  const raritiesMap = { limited: 'LIMITED', rare: 'RARE', super_rare: 'SUPER_RARE', unique: 'UNIQUE' };
 
   for (const p of players) {
-    console.log(`Sto recuperando i prezzi delle Manager Sales per ${p.name}...`);
-    
     const currentPrices = { limited: null, rare: null, super_rare: null, unique: null };
     let realName = p.name;
 
@@ -105,29 +85,20 @@ async function main() {
       if (result.displayName) realName = result.displayName;
     }
 
-    if (!history[p.slug]) {
-      history[p.slug] = { name: realName, points: [] };
-    } else {
-      history[p.slug].name = realName;
-      if (!history[p.slug].points) history[p.slug].points = [];
-    }
+    if (!history[p.slug]) history[p.slug] = { name: realName, points: [] };
+    else history[p.slug].name = realName;
 
     history[p.slug].points.push({
       timestamp: nowIso,
-      limited: currentPrices.limited,
-      rare: currentPrices.rare,
-      super_rare: currentPrices.super_rare,
-      unique: currentPrices.unique
+      ...currentPrices
     });
   }
 
   const dir = path.dirname(HISTORY_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
-  console.log('✅ Prezzi salvati con successo in history.json!');
+  console.log('✅ File aggiornato!');
 }
 
 main();

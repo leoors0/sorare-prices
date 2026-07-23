@@ -4,18 +4,12 @@ import path from 'path';
 const PLAYERS_FILE = 'players.json';
 const HISTORY_FILE = path.join('data', 'history.json');
 
-// Query corretta e testata per il mercato Sorare Football
+// Query basata sulla chiamata ufficiale della pagina del sito Sorare
 const QUERY = `
-  query GetFloorPrice($slug: String!, $rarity: CardRarity!) {
-    football {
-      player(slug: $slug) {
-        displayName
-      }
-    }
-    allCards(
+  query GetManagerSalesPagePrice($slug: String!, $rarity: CardRarity!) {
+    publicMarketCards(
       playerSlugs: [$slug]
       rarities: [$rarity]
-      onSale: true
       first: 1
     ) {
       nodes {
@@ -34,7 +28,7 @@ async function fetchFloorPrice(slug, rarity) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
       },
       body: JSON.stringify({
         query: QUERY,
@@ -44,11 +38,10 @@ async function fetchFloorPrice(slug, rarity) {
 
     const json = await res.json();
     
-    // Nome giocatore
-    const displayName = json?.data?.football?.player?.displayName || null;
-    
-    // Prima carta in vendita
-    const card = json?.data?.allCards?.nodes?.[0];
+    // Stampa di sicurezza nei log per vedere esattamente cosa risponde Sorare
+    console.log(`[${slug} - ${rarity}] Risposta:`, JSON.stringify(json));
+
+    const card = json?.data?.publicMarketCards?.nodes?.[0];
     const offer = card?.liveSingleSaleOffer;
 
     let priceEur = null;
@@ -61,10 +54,10 @@ async function fetchFloorPrice(slug, rarity) {
       }
     }
 
-    return { price: priceEur, displayName };
+    return priceEur;
   } catch (err) {
     console.error(`Errore per ${slug} [${rarity}]:`, err);
-    return { price: null, displayName: null };
+    return null;
   }
 }
 
@@ -76,18 +69,15 @@ async function main() {
   const raritiesMap = { limited: 'LIMITED', rare: 'RARE', super_rare: 'SUPER_RARE', unique: 'UNIQUE' };
 
   for (const p of players) {
-    console.log(`Recupero prezzi mercato per ${p.name}...`);
+    console.log(`\n--- Controllo ${p.name} ---`);
     const currentPrices = { limited: null, rare: null, super_rare: null, unique: null };
-    let realName = p.name;
 
     for (const [key, graphqlRarity] of Object.entries(raritiesMap)) {
-      const result = await fetchFloorPrice(p.slug, graphqlRarity);
-      currentPrices[key] = result.price;
-      if (result.displayName) realName = result.displayName;
+      const price = await fetchFloorPrice(p.slug, graphqlRarity);
+      currentPrices[key] = price;
     }
 
-    if (!history[p.slug]) history[p.slug] = { name: realName, points: [] };
-    else history[p.slug].name = realName;
+    if (!history[p.slug]) history[p.slug] = { name: p.name, points: [] };
 
     history[p.slug].points.push({
       timestamp: nowIso,
@@ -99,7 +89,7 @@ async function main() {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
-  console.log('✅ history.json aggiornato con successo!');
+  console.log('\n✅ File history.json aggiornato!');
 }
 
 main();

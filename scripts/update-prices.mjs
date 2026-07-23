@@ -10,7 +10,6 @@ query GetFloorPrice($slugs: [String!]!, $rarity: Rarity!) {
     slug
     lowestPriceAnyCard(rarity: $rarity) {
       liveSingleSaleOffer {
-        price
         priceInFiat {
           eur
         }

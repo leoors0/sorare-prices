@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Scout · Prezzi Sorare</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0E1B14;
+    --surface: #152420;
+    --surface-raised: #1C2E27;
+    --line: #2A3F35;
+    --text: #F1EDE2;
+    --text-dim: #9FB0A6;
+    --gold: #C9A227;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 16px; }
+  .header {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .header-top {
+    background: var(--surface-raised);
+    border-bottom: 1px solid var(--line);
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header-top .title {
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    font-size: 22px;
+  }
+  .header-top .tag {
+    color: var(--text-dim);
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .players { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px; }
+  .player-chip {
+    background: var(--surface-raised);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .player-chip.active { border-color: var(--gold); color: var(--gold); }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .player-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 0.03em;
+    margin-bottom: 4px;
+  }
+  .updated {
+    color: var(--text-dim);
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    margin-bottom: 16px;
+  }
+  .prices-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .price-box {
+    background: var(--surface-raised);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 12px 14px;
+  }
+  .price-box .label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+  .price-box .value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .empty { color: var(--text-dim); text-align: center; padding: 60px 0; font-size: 14px; }
+  canvas { max-height: 300px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="header-top">
+        <span class="title">SCOUT · PREZZI SORARE</span>
+        <span class="tag">CALCIO · AGGIORNATO OGNI 6 ORE</span>
+      </div>
+      <div class="players" id="players"></div>
+    </div>
+    <div id="content"><div class="empty">Caricamento...</div></div>
+  </div>
+
+<script>
+const RARITIES = [
+  { key: "limited", label: "Limited", color: "#6FA287" },
+  { key: "rare", label: "Rare", color: "#4E8FD1" },
+  { key: "super_rare", label: "Super Rare", color: "#B266D6" },
+  { key: "unique", label: "Unique", color: "#C9A227" },
+];
+
+let historyData = {};
+let chartInstance = null;
+
+async function load() {
+  try {
+    const res = await fetch('data/history.json?t=' + Date.now());
+    historyData = await res.json();
+  } catch (e) {
+    document.getElementById('content').innerHTML = '<div class="empty">Nessun dato ancora disponibile. Il robot aggiorna i prezzi ogni 6 ore: attendi il primo aggiornamento.</div>';
+    return;
+  }
+  const slugs = Object.keys(historyData);
+  if (slugs.length === 0) {
+    document.getElementById('content').innerHTML = '<div class="empty">Nessun dato ancora disponibile. Il robot aggiorna i prezzi ogni 6 ore: attendi il primo aggiornamento.</div>';
+    return;
+  }
+  renderChips(slugs);
+  showPlayer(slugs[0]);
+}
+
+function renderChips(slugs) {
+  const el = document.getElementById('players');
+  el.innerHTML = '';
+  slugs.forEach(slug => {
+    const chip = document.createElement('button');
+    chip.className = 'player-chip';
+    chip.textContent = historyData[slug].name;
+    chip.onclick = () => showPlayer(slug);
+    chip.dataset.slug = slug;
+    el.appendChild(chip);
+  });
+}
+
+function showPlayer(slug) {
+  document.querySelectorAll('.player-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.slug === slug);
+  });
+
+  const data = historyData[slug];
+  const points = data.points || [];
+  const latest = points[points.length - 1] || {};
+
+  let html = '<div class="card">';
+  html += `<div class="player-name">${data.name}</div>`;
+  html += `<div class="updated">Ultimo aggiornamento: ${latest.timestamp ? new Date(latest.timestamp).toLocaleString('it-IT') : '—'}</div>`;
+  html += '<div class="prices-grid">';
+  RARITIES.forEach(r => {
+    const price = latest[r.key];
+    html += `<div class="price-box" style="border-top: 2px solid ${r.color}">
+      <div class="label">${r.label}</div>
+      <div class="value" style="color: ${price != null ? '#F1EDE2' : '#9FB0A6'}">${price != null ? '€' + price.toLocaleString('it-IT') : '—'}</div>
+    </div>`;
+  });
+  html += '</div>';
+  html += '<canvas id="chart"></canvas>';
+  html += '</div>';
+
+  document.getElementById('content').innerHTML = html;
+
+  if (chartInstance) chartInstance.destroy();
+  const ctx = document.getElementById('chart').getContext('2d');
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: points.map(p => new Date(p.timestamp).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
+      datasets: RARITIES.map(r => ({
+        label: r.label,
+        data: points.map(p => p[r.key]),
+        borderColor: r.color,
+        backgroundColor: r.color,
+        spanGaps: true,
+        tension: 0.3,
+      })),
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#F1EDE2' } } },
+      scales: {
+        x: { ticks: { color: '#9FB0A6' }, grid: { color: '#2A3F35' } },
+        y: { ticks: { color: '#9FB0A6' }, grid: { color: '#2A3F35' } },
+      },
+    },
+  });
+}
+
+load();
+</script>
+</body>
+</html>

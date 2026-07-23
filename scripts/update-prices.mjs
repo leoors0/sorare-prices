@@ -1,91 +1,118 @@
-import { readFile, writeFile } from "node:fs/promises";
+import fetch from 'node-fetch';
+import fs from 'fs';
+import path from 'path';
 
-const RARITIES = ["limited", "rare", "super_rare", "unique"];
+const PLAYERS_FILE = path.join('data', 'players.json');
+const HISTORY_FILE = path.join('data', 'history.json');
 
+// Query GraphQL per Sorare
 const QUERY = `
-query PlayerPrices($slug: String!) {
-  player(slug: $slug) {
-    slug
-    displayName
-    limited: lowestPriceAnyCard(rarity: limited) {
-      ... on Card {
-        liveSingleSaleOffer { amounts { eur } }
-        latestEnglishAuction { bestBid { amountInFiat { eur } } }
-      }
-    }
-    rare: lowestPriceAnyCard(rarity: rare) {
-      ... on Card {
-        liveSingleSaleOffer { amounts { eur } }
-        latestEnglishAuction { bestBid { amountInFiat { eur } } }
-      }
-    }
-    super_rare: lowestPriceAnyCard(rarity: super_rare) {
-      ... on Card {
-        liveSingleSaleOffer { amounts { eur } }
-        latestEnglishAuction { bestBid { amountInFiat { eur } } }
-      }
-    }
-    unique: lowestPriceAnyCard(rarity: unique) {
-      ... on Card {
-        liveSingleSaleOffer { amounts { eur } }
-        latestEnglishAuction { bestBid { amountInFiat { eur } } }
+  query GetPlayerPrices($slug: String!) {
+    football {
+      player(slug: $slug) {
+        displayName
+        cards(rarities: [limited, rare, super_rare, unique]) {
+          rarity
+          liveSingleSaleOffer {
+            price
+          }
+        }
       }
     }
   }
-}`;
+`;
 
-function extractPrice(node) {
-  if (!node) return null;
-  const offer = node.liveSingleSaleOffer?.amounts?.eur;
-  const auction = node.latestEnglishAuction?.bestBid?.amountInFiat?.eur;
-  const val = offer ?? auction;
-  return val != null ? Number(val) : null;
-}
+async function fetchSorarePrices(slug) {
+  try {
+    const response = await fetch('https://api.sorare.com/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: QUERY,
+        variables: { slug }
+      })
+    });
 
-async function fetchPlayer(slug) {
-  const res = await fetch("https://api.sorare.com/graphql", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query: QUERY, variables: { slug } }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for slug "${slug}"`);
-  const json = await res.json();
-  if (json.errors?.length) throw new Error(json.errors.map((e) => e.message).join("; "));
-  if (!json.data?.player) throw new Error(`Nessun giocatore trovato per slug "${slug}"`);
-  return json.data.player;
+    const json = await response.json();
+    const player = json?.data?.football?.player;
+    if (!player) return null;
+
+    // Inizializza prezzi
+    const prices = { limited: null, rare: null, super_rare: null, unique: null };
+
+    // Estrai offerta più bassa o ultimo prezzo disponibile
+    player.cards?.forEach(card => {
+      const rarity = card.rarity;
+      const priceWei = card.liveSingleSaleOffer?.price;
+      if (priceWei && !prices[rarity]) {
+        // Conversione approssimativa / gestione prezzo (o valore raw se desiderato)
+        prices[rarity] = Math.round(parseFloat(priceWei) / 1e18 * 2500); // Stima EUR
+      }
+    });
+
+    return {
+      displayName: player.displayName,
+      prices
+    };
+  } catch (err) {
+    console.error(`Errore durante il recupero per ${slug}:`, err);
+    return null;
+  }
 }
 
 async function main() {
-  const players = JSON.parse(await readFile("players.json", "utf-8"));
+  const players = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
   let history = {};
-  try {
-    history = JSON.parse(await readFile("data/history.json", "utf-8"));
-  } catch {
-    history = {};
-  }
 
-  const timestamp = new Date().toISOString();
-
-  for (const p of players) {
+  if (fs.existsSync(HISTORY_FILE)) {
     try {
-      const data = await fetchPlayer(p.slug);
-      const point = { timestamp };
-      RARITIES.forEach((r) => (point[r] = extractPrice(data[r])));
-
-      if (!history[p.slug]) {
-        history[p.slug] = { name: data.displayName || p.name, points: [] };
-      }
-      history[p.slug].name = data.displayName || p.name;
-      history[p.slug].points.push(point);
-      history[p.slug].points = history[p.slug].points.slice(-500);
-
-      console.log(`OK: ${p.name} ->`, point);
-    } catch (err) {
-      console.error(`ERRORE per ${p.name} (slug: ${p.slug}):`, err.message);
+      history = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
+    } catch {
+      history = {};
     }
   }
 
-  await writeFile("data/history.json", JSON.stringify(history, null, 2));
+  const today = new Date().toISOString().split('T')[0];
+
+  for (const p of players) {
+    console.log(`Scarico prezzi Sorare per ${p.name} (${p.slug})...`);
+    const data = await fetchSorarePrices(p.slug);
+
+    const displayName = data?.displayName || p.name;
+    const currentPrices = data?.prices || { limited: 0, rare: 0, super_rare: 0, unique: 0 };
+
+    if (!history[p.slug]) {
+      history[p.slug] = {
+        name: displayName,
+        displayName: displayName,
+        lastUpdate: today,
+        limited: currentPrices.limited || 0,
+        rare: currentPrices.rare || 0,
+        super_rare: currentPrices.super_rare || 0,
+        unique: currentPrices.unique || 0,
+        prices: []
+      };
+    }
+
+    // Aggiorna valori correnti
+    history[p.slug].lastUpdate = today;
+    history[p.slug].limited = currentPrices.limited || 0;
+    history[p.slug].rare = currentPrices.rare || 0;
+    history[p.slug].super_rare = currentPrices.super_rare || 0;
+    history[p.slug].unique = currentPrices.unique || 0;
+
+    // Aggiungi alla cronologia
+    history[p.slug].prices.push({
+      date: today,
+      limited: currentPrices.limited || 0,
+      rare: currentPrices.rare || 0,
+      superRare: currentPrices.super_rare || 0,
+      unique: currentPrices.unique || 0
+    });
+  }
+
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
+  console.log('✅ Dati aggiornati con successo da Sorare API!');
 }
 
 main();

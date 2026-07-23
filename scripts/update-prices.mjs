@@ -6,13 +6,16 @@ const HISTORY_FILE = path.join('data', 'history.json');
 
 // Query verificata sullo schema ufficiale di Sorare
 const QUERY = `
-query GetFloorPrice($slug: String!, $rarity: Rarity!) {
-  player(slug: $slug) {
-    lowestPriceAnyCard(rarity: $rarity) {
-      liveSingleSaleOffer {
-        price
-        priceInFiat {
-          eur
+query GetFloorPrice($slugs: [String!]!, $rarity: Rarity!) {
+  players(slugs: $slugs) {
+    nodes {
+      slug
+      lowestPriceAnyCard(rarity: $rarity) {
+        liveSingleSaleOffer {
+          price
+          priceInFiat {
+            eur
+          }
         }
       }
     }
@@ -30,26 +33,25 @@ async function fetchFloorPrice(slug, rarity) {
       },
       body: JSON.stringify({
         query: QUERY,
-        variables: { slug, rarity }
+        variables: { slugs: [slug], rarity }
       })
     });
 
     const json = await res.json();
     console.log(`[${slug} - ${rarity}] Risposta:`, JSON.stringify(json));
 
-    const card = json?.data?.player?.lowestPriceAnyCard;
-    const offer = card?.liveSingleSaleOffer;
+    const player = json?.data?.players?.nodes?.[0];
+    const offer = player?.lowestPriceAnyCard?.liveSingleSaleOffer;
 
     if (offer?.priceInFiat?.eur != null) {
       return Math.round(parseFloat(offer.priceInFiat.eur));
     }
-    return null; // nessuna carta in vendita per questa rarità: è normale, non un errore
+    return null;
   } catch (err) {
     console.error(`Errore per ${slug} [${rarity}]:`, err);
     return null;
   }
 }
-
 async function main() {
   let players = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
   let history = fs.existsSync(HISTORY_FILE) ? JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')) : {};

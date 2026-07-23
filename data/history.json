@@ -29,6 +29,15 @@
         "superRare": 0,
         "unique": 0
       }
+    ],
+    "points": [
+      {
+        "timestamp": "2026-07-23T02:39:41.610Z",
+        "limited": null,
+        "rare": null,
+        "super_rare": null,
+        "unique": null
+      }
     ]
   },
   "erling-haaland": {
@@ -61,6 +70,15 @@
         "superRare": 0,
         "unique": 0
       }
+    ],
+    "points": [
+      {
+        "timestamp": "2026-07-23T02:39:41.610Z",
+        "limited": null,
+        "rare": null,
+        "super_rare": null,
+        "unique": null
+      }
     ]
   },
   "jude-bellingham": {
@@ -92,6 +110,15 @@
         "rare": 0,
         "superRare": 0,
         "unique": 0
+      }
+    ],
+    "points": [
+      {
+        "timestamp": "2026-07-23T02:39:41.610Z",
+        "limited": null,
+        "rare": null,
+        "super_rare": null,
+        "unique": null
       }
     ]
   }

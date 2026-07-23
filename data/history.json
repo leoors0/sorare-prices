@@ -1,6 +1,6 @@
 {
   "kylian-mbappe-lottin": {
-    "name": "kylian-mbappe-lottin",
+    "name": "Kylian Mbappé",
     "displayName": "Kylian Mbappé",
     "lastUpdate": "2026-07-23",
     "limited": 0,
@@ -65,11 +65,18 @@
         "rare": null,
         "super_rare": null,
         "unique": null
+      },
+      {
+        "timestamp": "2026-07-23T03:09:50.891Z",
+        "limited": null,
+        "rare": null,
+        "super_rare": null,
+        "unique": null
       }
     ]
   },
   "erling-haaland": {
-    "name": "erling-haaland",
+    "name": "Erling Haaland",
     "displayName": "Erling Haaland",
     "lastUpdate": "2026-07-23",
     "limited": 0,
@@ -134,11 +141,18 @@
         "rare": null,
         "super_rare": null,
         "unique": null
+      },
+      {
+        "timestamp": "2026-07-23T03:09:50.891Z",
+        "limited": null,
+        "rare": null,
+        "super_rare": null,
+        "unique": null
       }
     ]
   },
   "jude-bellingham": {
-    "name": "jude-bellingham",
+    "name": "Jude Bellingham",
     "displayName": "Jude Bellingham",
     "lastUpdate": "2026-07-23",
     "limited": 0,
@@ -199,6 +213,13 @@
       },
       {
         "timestamp": "2026-07-23T03:04:00.419Z",
+        "limited": null,
+        "rare": null,
+        "super_rare": null,
+        "unique": null
+      },
+      {
+        "timestamp": "2026-07-23T03:09:50.891Z",
         "limited": null,
         "rare": null,
         "super_rare": null,

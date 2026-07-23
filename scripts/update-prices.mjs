@@ -4,18 +4,15 @@ import path from 'path';
 const PLAYERS_FILE = 'players.json';
 const HISTORY_FILE = path.join('data', 'history.json');
 
-// Query verificata sullo schema ufficiale di Sorare
 const QUERY = `
 query GetFloorPrice($slugs: [String!]!, $rarity: Rarity!) {
   players(slugs: $slugs) {
-    nodes {
-      slug
-      lowestPriceAnyCard(rarity: $rarity) {
-        liveSingleSaleOffer {
-          price
-          priceInFiat {
-            eur
-          }
+    slug
+    lowestPriceAnyCard(rarity: $rarity) {
+      liveSingleSaleOffer {
+        price
+        priceInFiat {
+          eur
         }
       }
     }
@@ -40,7 +37,8 @@ async function fetchFloorPrice(slug, rarity) {
     const json = await res.json();
     console.log(`[${slug} - ${rarity}] Risposta:`, JSON.stringify(json));
 
-    const player = json?.data?.players?.nodes?.[0];
+    const playersData = json?.data?.players;
+    const player = Array.isArray(playersData) ? playersData[0] : playersData;
     const offer = player?.lowestPriceAnyCard?.liveSingleSaleOffer;
 
     if (offer?.priceInFiat?.eur != null) {
@@ -52,6 +50,7 @@ async function fetchFloorPrice(slug, rarity) {
     return null;
   }
 }
+
 async function main() {
   let players = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
   let history = fs.existsSync(HISTORY_FILE) ? JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')) : {};

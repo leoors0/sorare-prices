@@ -4,7 +4,6 @@ import path from 'path';
 const PLAYERS_FILE = 'players.json';
 const HISTORY_FILE = path.join('data', 'history.json');
 
-// Query GraphQL per Sorare
 const QUERY = `
   query GetPlayerPrices($slug: String!) {
     football {
@@ -36,16 +35,14 @@ async function fetchSorarePrices(slug) {
     const player = json?.data?.football?.player;
     if (!player) return null;
 
-    // Inizializza prezzi
     const prices = { limited: null, rare: null, super_rare: null, unique: null };
 
-    // Estrai offerta più bassa o ultimo prezzo disponibile
     player.cards?.forEach(card => {
       const rarity = card.rarity;
       const priceWei = card.liveSingleSaleOffer?.price;
-      if (priceWei && !prices[rarity]) {
-        // Conversione approssimativa / gestione prezzo (o valore raw se desiderato)
-        prices[rarity] = Math.round(parseFloat(priceWei) / 1e18 * 2500); // Stima EUR
+      if (priceWei && prices[rarity] === null) {
+        // Conversione stima EUR
+        prices[rarity] = Math.round((parseFloat(priceWei) / 1e18) * 2500);
       }
     });
 
@@ -54,15 +51,21 @@ async function fetchSorarePrices(slug) {
       prices
     };
   } catch (err) {
-    console.error(`Errore durante il recupero per ${slug}:`, err);
+    console.error(`Errore per ${slug}:`, err);
     return null;
   }
 }
 
 async function main() {
-  const players = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
-  let history = {};
+  let players = [];
+  try {
+    players = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
+  } catch (e) {
+    console.error('Errore nel caricamento di players.json:', e);
+    return;
+  }
 
+  let history = {};
   if (fs.existsSync(HISTORY_FILE)) {
     try {
       history = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
@@ -71,47 +74,45 @@ async function main() {
     }
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  const nowIso = new Date().toISOString();
 
   for (const p of players) {
-    console.log(`Scarico prezzi Sorare per ${p.name} (${p.slug})...`);
+    console.log(`Scarico da Sorare per ${p.name} (${p.slug})...`);
     const data = await fetchSorarePrices(p.slug);
 
     const displayName = data?.displayName || p.name;
-    const currentPrices = data?.prices || { limited: 0, rare: 0, super_rare: 0, unique: 0 };
+    const currentPrices = data?.prices || { limited: null, rare: null, super_rare: null, unique: null };
 
     if (!history[p.slug]) {
       history[p.slug] = {
         name: displayName,
-        displayName: displayName,
-        lastUpdate: today,
-        limited: currentPrices.limited || 0,
-        rare: currentPrices.rare || 0,
-        super_rare: currentPrices.super_rare || 0,
-        unique: currentPrices.unique || 0,
-        prices: []
+        points: []
       };
+    } else {
+      history[p.slug].name = displayName;
+      if (!history[p.slug].points) {
+        history[p.slug].points = [];
+      }
     }
 
-    // Aggiorna valori correnti
-    history[p.slug].lastUpdate = today;
-    history[p.slug].limited = currentPrices.limited || 0;
-    history[p.slug].rare = currentPrices.rare || 0;
-    history[p.slug].super_rare = currentPrices.super_rare || 0;
-    history[p.slug].unique = currentPrices.unique || 0;
-
-    // Aggiungi alla cronologia
-    history[p.slug].prices.push({
-      date: today,
-      limited: currentPrices.limited || 0,
-      rare: currentPrices.rare || 0,
-      superRare: currentPrices.super_rare || 0,
-      unique: currentPrices.unique || 0
+    // Aggiunge un punto nello storico esattamente nel formato letto da index.html
+    history[p.slug].points.push({
+      timestamp: nowIso,
+      limited: currentPrices.limited,
+      rare: currentPrices.rare,
+      super_rare: currentPrices.super_rare,
+      unique: currentPrices.unique
     });
   }
 
+  // Assicura che la cartella data esista
+  const dir = path.dirname(HISTORY_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
-  console.log('✅ Dati aggiornati con successo da Sorare API!');
+  console.log('✅ File history.json aggiornato con successo!');
 }
 
 main();

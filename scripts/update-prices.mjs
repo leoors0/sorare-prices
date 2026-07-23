@@ -4,6 +4,7 @@ import path from 'path';
 const PLAYERS_FILE = 'players.json';
 const HISTORY_FILE = path.join('data', 'history.json');
 
+// Query GraphQL ottimizzata per il mercato secondario dei manager
 const QUERY = `
   query GetPlayerPrices($slug: String!) {
     football {
@@ -12,6 +13,7 @@ const QUERY = `
         cards(rarities: [limited, rare, super_rare, unique]) {
           rarity
           liveSingleSaleOffer {
+            priceInEURCent
             price
           }
         }
@@ -24,7 +26,10 @@ async function fetchSorarePrices(slug) {
   try {
     const response = await fetch('https://api.sorare.com/graphql', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0'
+      },
       body: JSON.stringify({
         query: QUERY,
         variables: { slug }
@@ -37,12 +42,28 @@ async function fetchSorarePrices(slug) {
 
     const prices = { limited: null, rare: null, super_rare: null, unique: null };
 
+    // Cerca il prezzo MINIMO dei manager attualmente in vendita per ogni rarità
     player.cards?.forEach(card => {
       const rarity = card.rarity;
-      const priceWei = card.liveSingleSaleOffer?.price;
-      if (priceWei && prices[rarity] === null) {
-        // Conversione stima EUR
-        prices[rarity] = Math.round((parseFloat(priceWei) / 1e18) * 2500);
+      const offer = card.liveSingleSaleOffer;
+
+      if (offer) {
+        let priceEur = null;
+
+        // Se Sorare fornisce direttamente i centesimi di EUR del mercato secondario
+        if (offer.priceInEURCent) {
+          priceEur = Math.round(offer.priceInEURCent / 100);
+        } else if (offer.price) {
+          // Fallback con conversione stimata da Wei/ETH
+          priceEur = Math.round((parseFloat(offer.price) / 1e18) * 2500);
+        }
+
+        if (priceEur !== null) {
+          // Se non c'è ancora un prezzo salvato o se ne troviamo uno più basso, aggiorniamo (Floor Price)
+          if (prices[rarity] === null || priceEur < prices[rarity]) {
+            prices[rarity] = priceEur;
+          }
+        }
       }
     });
 
@@ -51,7 +72,7 @@ async function fetchSorarePrices(slug) {
       prices
     };
   } catch (err) {
-    console.error(`Errore per ${slug}:`, err);
+    console.error(`Errore recupero Sorare per ${slug}:`, err);
     return null;
   }
 }
@@ -61,7 +82,7 @@ async function main() {
   try {
     players = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
   } catch (e) {
-    console.error('Errore nel caricamento di players.json:', e);
+    console.error('Errore lettura players.json:', e);
     return;
   }
 
@@ -77,25 +98,19 @@ async function main() {
   const nowIso = new Date().toISOString();
 
   for (const p of players) {
-    console.log(`Scarico da Sorare per ${p.name} (${p.slug})...`);
+    console.log(`Scarico prezzo minimo manager per ${p.name} (${p.slug})...`);
     const data = await fetchSorarePrices(p.slug);
 
     const displayName = data?.displayName || p.name;
     const currentPrices = data?.prices || { limited: null, rare: null, super_rare: null, unique: null };
 
     if (!history[p.slug]) {
-      history[p.slug] = {
-        name: displayName,
-        points: []
-      };
+      history[p.slug] = { name: displayName, points: [] };
     } else {
       history[p.slug].name = displayName;
-      if (!history[p.slug].points) {
-        history[p.slug].points = [];
-      }
+      if (!history[p.slug].points) history[p.slug].points = [];
     }
 
-    // Aggiunge un punto nello storico esattamente nel formato letto da index.html
     history[p.slug].points.push({
       timestamp: nowIso,
       limited: currentPrices.limited,
@@ -105,14 +120,13 @@ async function main() {
     });
   }
 
-  // Assicura che la cartella data esista
   const dir = path.dirname(HISTORY_FILE);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
-  console.log('✅ File history.json aggiornato con successo!');
+  console.log('✅ File history.json aggiornato con i prezzi minimi dei manager!');
 }
 
 main();

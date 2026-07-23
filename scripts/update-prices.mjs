@@ -4,45 +4,66 @@ import path from 'path';
 const PLAYERS_FILE = 'players.json';
 const HISTORY_FILE = path.join('data', 'history.json');
 
-async function fetchFloorPrices(slug) {
-  const rarities = ['limited', 'rare', 'super_rare', 'unique'];
-  const prices = { limited: null, rare: null, super_rare: null, unique: null };
-  let displayName = null;
-
-  for (const rarity of rarities) {
-    try {
-      // Cerca le carte messe in vendita dai manager per questa rarità
-      // ordinate per prezzo CRESCENTE (il primo risultato è il prezzo minimo in vendita)
-      const url = `https://api.sorare.com/api/v1/cards?player_slugs=${slug}&rarity=${rarity}&on_sale=true&sort=price_asc&limit=1`;
-      
-      const response = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      });
-
-      if (response.ok) {
-        const cards = await response.json();
-        if (Array.isArray(cards) && cards.length > 0) {
-          const cheapestCard = cards[0];
-          
-          if (!displayName && cheapestCard.player?.display_name) {
-            displayName = cheapestCard.player.display_name;
-          }
-
-          // Prende il prezzo in Euro impostato dal manager che vende
-          if (cheapestCard.active_order?.price_in_eur) {
-            prices[rarity] = Math.round(cheapestCard.active_order.price_in_eur);
+// Query GraphQL identica a quella usata dal sito ufficiale Sorare per le Manager Sales
+const QUERY = `
+  query GetManagerSalesFloorPrice($slug: String!, $rarity: CardRarity!) {
+    football {
+      player(slug: $slug) {
+        displayName
+        cards(
+          rarities: [$rarity]
+          onSale: true
+          first: 1
+        ) {
+          nodes {
+            liveSingleSaleOffer {
+              priceInEURCent
+              price
+            }
           }
         }
       }
-    } catch (err) {
-      console.error(`Errore per ${slug} (${rarity}):`, err);
     }
   }
+`;
 
-  return {
-    displayName: displayName || slug,
-    prices
-  };
+async function fetchFloorPrice(slug, rarity) {
+  try {
+    const res = await fetch('https://api.sorare.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+      },
+      body: JSON.stringify({
+        query: QUERY,
+        variables: { slug, rarity }
+      })
+    });
+
+    const json = await res.json();
+    const player = json?.data?.football?.player;
+    const card = player?.cards?.nodes?.[0];
+
+    if (!card) return { price: null, displayName: player?.displayName || null };
+
+    const offer = card.liveSingleSaleOffer;
+    let priceEur = null;
+
+    if (offer) {
+      if (offer.priceInEURCent) {
+        priceEur = Math.round(offer.priceInEURCent / 100);
+      } else if (offer.price) {
+        // Conversione da Wei in EUR
+        priceEur = Math.round((parseFloat(offer.price) / 1e18) * 2500);
+      }
+    }
+
+    return { price: priceEur, displayName: player?.displayName || null };
+  } catch (err) {
+    console.error(`Errore recupero ${slug} [${rarity}]:`, err);
+    return { price: null, displayName: null };
+  }
 }
 
 async function main() {
@@ -64,18 +85,30 @@ async function main() {
   }
 
   const nowIso = new Date().toISOString();
+  // Rarità formattate secondo l'enum di Sorare (in maiuscolo)
+  const raritiesMap = {
+    limited: 'LIMITED',
+    rare: 'RARE',
+    super_rare: 'SUPER_RARE',
+    unique: 'UNIQUE'
+  };
 
   for (const p of players) {
-    console.log(`Cerco il prezzo minimo in vendita per ${p.name}...`);
-    const data = await fetchFloorPrices(p.slug);
+    console.log(`Sto recuperando i prezzi delle Manager Sales per ${p.name}...`);
+    
+    const currentPrices = { limited: null, rare: null, super_rare: null, unique: null };
+    let realName = p.name;
 
-    const displayName = data?.displayName || p.name;
-    const currentPrices = data?.prices || { limited: null, rare: null, super_rare: null, unique: null };
+    for (const [key, graphqlRarity] of Object.entries(raritiesMap)) {
+      const result = await fetchFloorPrice(p.slug, graphqlRarity);
+      currentPrices[key] = result.price;
+      if (result.displayName) realName = result.displayName;
+    }
 
     if (!history[p.slug]) {
-      history[p.slug] = { name: displayName, points: [] };
+      history[p.slug] = { name: realName, points: [] };
     } else {
-      history[p.slug].name = displayName;
+      history[p.slug].name = realName;
       if (!history[p.slug].points) history[p.slug].points = [];
     }
 
@@ -94,7 +127,7 @@ async function main() {
   }
 
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
-  console.log('✅ history.json aggiornato con i prezzi minimi dei manager!');
+  console.log('✅ Prezzi salvati con successo in history.json!');
 }
 
-main();3
+main();

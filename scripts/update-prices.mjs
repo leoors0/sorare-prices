@@ -10,10 +10,7 @@ query GetFloorPrice($slugs: [String!]!, $rarity: Rarity!) {
     slug
     lowestPriceAnyCard(rarity: $rarity) {
       liveSingleSaleOffer {
-        amount
-        amountInFiat {
-          eur
-        }
+        price
       }
     }
   }
@@ -41,10 +38,10 @@ async function fetchFloorPrice(slug, rarity) {
     const player = Array.isArray(playersData) ? playersData[0] : playersData;
     const offer = player?.lowestPriceAnyCard?.liveSingleSaleOffer;
 
-    if (offer?.amountInFiat?.eur != null) {
-      return Math.round(parseFloat(offer.amountInFiat.eur));
+    if (offer?.price != null) {
+      return offer.price;
     }
-    return null; // nessuna carta in vendita per questa rarità in questo momento: è normale
+    return null;
   } catch (err) {
     console.error(`Errore per ${slug} [${rarity}]:`, err);
     return null;

@@ -1,35 +1,24 @@
 async function main() {
-  const query = `
-    query Diag($slugs: [String!]!, $rarity: Rarity!) {
-      players(slugs: $slugs) {
-        slug
-        lowestPriceAnyCard(rarity: $rarity) {
-          liveSingleSaleOffer {
-            id
-            price
-            amount
-            priceInFiat
-            amountInFiat
-            wei
-            eurCents
-            usdCents
-            gbpCents
-            cents
-            fiat
-            value
-          }
+  const query = `{
+    __type(name: "TokenOffer") {
+      name
+      fields {
+        name
+        type {
+          name
+          kind
+          ofType { name kind }
         }
       }
     }
-  `;
-  const res = await fetch('https://api.sorare.com/graphql', {
+  }`;
+
+  const res = await fetch('https://api.sorare.com/federation/graphql', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query,
-      variables: { slugs: ['kylian-mbappe-lottin'], rarity: 'limited' }
-    })
+    body: JSON.stringify({ query })
   });
+
   const json = await res.json();
   console.log(JSON.stringify(json, null, 2));
 }

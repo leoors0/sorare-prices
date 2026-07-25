@@ -5,17 +5,19 @@ const PLAYERS_FILE = 'players.json';
 const HISTORY_FILE = path.join('data', 'history.json');
 
 const QUERY = `
-query GetFloorPrice($slugs: [String!]!, $rarity: Rarity!) {
+query GetCardsForRarity($slugs: [String!]!, $rarity: Rarity!) {
   players(slugs: $slugs) {
     slug
-    lowestPriceAnyCard(rarity: $rarity) {
-      liveSingleSaleOffer {
-        receiverSide {
-          amounts {
-            referenceCurrency
-            eurCents
-            gbpCents
-            usdCents
+    anyCards(rarities: [$rarity], first: 50, inSeasonEligible: true) {
+      nodes {
+        liveSingleSaleOffer {
+          receiverSide {
+            amounts {
+              referenceCurrency
+              eurCents
+              gbpCents
+              usdCents
+            }
           }
         }
       }

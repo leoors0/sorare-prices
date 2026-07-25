@@ -8,13 +8,15 @@ async function main() {
             senderSide {
               amounts {
                 referenceCurrency
-                eur
+                eurCents
+                wei
               }
             }
             receiverSide {
               amounts {
                 referenceCurrency
-                eur
+                eurCents
+                wei
               }
             }
           }

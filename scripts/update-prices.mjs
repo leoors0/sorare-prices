@@ -5,18 +5,19 @@ const PLAYERS_FILE = 'players.json';
 const HISTORY_FILE = path.join('data', 'history.json');
 
 const QUERY = `
-query GetCardsForRarity($slugs: [String!]!, $rarity: Rarity!) {
-  players(slugs: $slugs) {
-    slug
-    anyCards(rarities: [$rarity], first: 50, inSeasonEligible: true) {
-      nodes {
-        liveSingleSaleOffer {
-          receiverSide {
-            amounts {
-              referenceCurrency
-              eurCents
-              gbpCents
-              usdCents
+query GetCardsForRarity($slug: String!, $rarity: Rarity!) {
+  football {
+    player(slug: $slug) {
+      anyCards(rarities: [$rarity], first: 50, inSeasonEligible: true) {
+        nodes {
+          liveSingleSaleOffer {
+            receiverSide {
+              amounts {
+                referenceCurrency
+                eurCents
+                gbpCents
+                usdCents
+              }
             }
           }
         }
@@ -47,18 +48,21 @@ async function fetchFloorPrice(slug, rarity) {
       },
       body: JSON.stringify({
         query: QUERY,
-        variables: { slugs: [slug], rarity }
+        variables: { slug, rarity }
       })
     });
 
     const json = await res.json();
     console.log(`[${slug} - ${rarity}] Risposta:`, JSON.stringify(json));
 
-    const playersData = json?.data?.players;
-    const player = Array.isArray(playersData) ? playersData[0] : playersData;
-    const amounts = player?.lowestPriceAnyCard?.liveSingleSaleOffer?.receiverSide?.amounts;
+    const nodes = json?.data?.football?.player?.anyCards?.nodes || [];
 
-    return extractEuroPrice(amounts);
+    const prices = nodes
+      .map(n => extractEuroPrice(n?.liveSingleSaleOffer?.receiverSide?.amounts))
+      .filter(p => p != null);
+
+    if (prices.length === 0) return null;
+    return Math.min(...prices);
   } catch (err) {
     console.error(`Errore per ${slug} [${rarity}]:`, err);
     return null;

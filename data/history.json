@@ -1668,6 +1668,13 @@
         "rare": 759,
         "super_rare": null,
         "unique": null
+      },
+      {
+        "timestamp": "2026-09-22T20:53:42.433Z",
+        "limited": 198,
+        "rare": 759,
+        "super_rare": 3400,
+        "unique": null
       }
     ]
   },
@@ -3336,6 +3343,13 @@
       },
       {
         "timestamp": "2026-09-22T16:17:57.178Z",
+        "limited": null,
+        "rare": null,
+        "super_rare": null,
+        "unique": null
+      },
+      {
+        "timestamp": "2026-09-22T20:53:42.433Z",
         "limited": null,
         "rare": null,
         "super_rare": null,
@@ -5009,6 +5023,13 @@
       {
         "timestamp": "2026-09-22T16:17:57.178Z",
         "limited": 143,
+        "rare": 505,
+        "super_rare": null,
+        "unique": null
+      },
+      {
+        "timestamp": "2026-09-22T20:53:42.433Z",
+        "limited": 140,
         "rare": 505,
         "super_rare": null,
         "unique": null
